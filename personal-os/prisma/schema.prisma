@@ -1,0 +1,307 @@
+// This is the Prisma schema for Supabase (PostgreSQL) cloud sync.
+// Phase 4 — not active yet. Used as a reference for the database structure.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User Settings ──────────────────
+model UserSettings {
+  id                   String   @id @default(uuid())
+  displayName          String?  @map("display_name")
+  email                String?
+  theme                String   @default("system")
+  defaultDayType       String   @default("work") @map("default_day_type")
+  defaultTimerMode     String   @default("pomodoro") @map("default_timer_mode")
+  pomodoroWorkMinutes  Int      @default(25) @map("pomodoro_work_minutes")
+  pomodoroBreakMinutes Int      @default(5) @map("pomodoro_break_minutes")
+  deepworkWorkMinutes  Int      @default(50) @map("deepwork_work_minutes")
+  deepworkBreakMinutes Int      @default(10) @map("deepwork_break_minutes")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("user_settings")
+}
+
+// ─── Day Plans ──────────────────────
+model DayPlan {
+  id            String          @id @default(uuid())
+  date          String          @unique
+  dayType       String          @map("day_type")
+  templateId    String?         @map("template_id")
+  intention     String?
+  sleepHours    Float?          @map("sleep_hours")
+  sleepQuality  Int?            @map("sleep_quality")
+  bedtime       String?
+  wakeTime      String?         @map("wake_time")
+  morningEnergy Int?            @map("morning_energy")
+  overallEnergy Int?            @map("overall_energy")
+  overallFocus  Int?            @map("overall_focus")
+  startedAt     String?         @map("started_at")
+  endedAt       String?         @map("ended_at")
+  status        String          @default("planning")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  timeBlocks    TimeBlock[]
+  timeSessions  TimeSession[]
+  habitLogs     HabitLog[]
+  urgeEvents    UrgeEvent[]
+  journalEntry  JournalEntry?
+  dailyScore    DailyScore?
+
+  @@map("day_plans")
+}
+
+// ─── Day Templates ──────────────────
+model DayTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  dayType         String   @map("day_type")
+  deepWorkTarget  Int      @map("deep_work_target")
+  skillTarget     Int      @map("skill_target")
+  goalTarget      Int      @map("goal_target")
+  blocks          Json     @default("[]")
+  isDefault       Boolean  @default(false) @map("is_default")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("day_templates")
+}
+
+// ─── Categories ─────────────────────
+model Category {
+  id            String        @id @default(uuid())
+  name          String
+  color         String
+  icon          String
+  isDistraction Boolean       @default(false) @map("is_distraction")
+  isDefault     Boolean       @default(true) @map("is_default")
+  sortOrder     Int           @default(0) @map("sort_order")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  timeSessions  TimeSession[]
+
+  @@map("categories")
+}
+
+// ─── Time Blocks ────────────────────
+model TimeBlock {
+  id              String   @id @default(uuid())
+  dayPlanId       String   @map("day_plan_id")
+  title           String
+  categoryId      String   @map("category_id")
+  startTime       String   @map("start_time")
+  endTime         String   @map("end_time")
+  isNonNegotiable Boolean  @default(false) @map("is_non_negotiable")
+  status          String   @default("pending")
+  goalId          String?  @map("goal_id")
+  skillId         String?  @map("skill_id")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  dayPlan         DayPlan  @relation(fields: [dayPlanId], references: [id])
+
+  @@map("time_blocks")
+}
+
+// ─── Time Sessions ──────────────────
+model TimeSession {
+  id                 String         @id @default(uuid())
+  dayPlanId          String         @map("day_plan_id")
+  timeBlockId        String?        @map("time_block_id")
+  title              String
+  categoryId         String         @map("category_id")
+  startedAt          String         @map("started_at")
+  endedAt            String?        @map("ended_at")
+  durationMinutes    Int            @map("duration_minutes")
+  isManualEntry      Boolean        @default(false) @map("is_manual_entry")
+  energyLevel        Int?           @map("energy_level")
+  focusLevel         Int?           @map("focus_level")
+  notes              String?
+  goalId             String?        @map("goal_id")
+  skillId            String?        @map("skill_id")
+  isDistraction      Boolean        @default(false) @map("is_distraction")
+  distractionCategory String?       @map("distraction_category")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+  dayPlan            DayPlan        @relation(fields: [dayPlanId], references: [id])
+  category           Category       @relation(fields: [categoryId], references: [id])
+  focusSessions      FocusSession[]
+
+  @@map("time_sessions")
+}
+
+// ─── Focus Sessions ─────────────────
+model FocusSession {
+  id              String      @id @default(uuid())
+  timeSessionId   String      @map("time_session_id")
+  intervalType    String      @map("interval_type")
+  durationMinutes Int         @map("duration_minutes")
+  wasCompleted    Boolean     @default(true) @map("was_completed")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  timeSession     TimeSession @relation(fields: [timeSessionId], references: [id])
+
+  @@map("focus_sessions")
+}
+
+// ─── Goals ──────────────────────────
+model Goal {
+  id              String          @id @default(uuid())
+  title           String
+  description     String?
+  type            String
+  status          String          @default("active")
+  targetDate      String?         @map("target_date")
+  priority        String          @default("medium")
+  isWeeklyFocus   Boolean         @default(false) @map("is_weekly_focus")
+  progressPercent Int             @default(0) @map("progress_percent")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  milestones      GoalMilestone[]
+
+  @@map("goals")
+}
+
+// ─── Goal Milestones ────────────────
+model GoalMilestone {
+  id          String   @id @default(uuid())
+  goalId      String   @map("goal_id")
+  title       String
+  isCompleted Boolean  @default(false) @map("is_completed")
+  completedAt String?  @map("completed_at")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  goal        Goal     @relation(fields: [goalId], references: [id])
+
+  @@map("goal_milestones")
+}
+
+// ─── Skills ─────────────────────────
+model Skill {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  goalId       String?  @map("goal_id")
+  totalMinutes Int      @default(0) @map("total_minutes")
+  targetLevel  String?  @map("target_level")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("skills")
+}
+
+// ─── Habits ─────────────────────────
+model Habit {
+  id            String     @id @default(uuid())
+  name          String
+  description   String?
+  type          String
+  frequency     String     @default("daily")
+  frequencyDays Json?      @map("frequency_days")
+  weight        Float      @default(1)
+  isActive      Boolean    @default(true) @map("is_active")
+  currentStreak Int        @default(0) @map("current_streak")
+  longestStreak Int        @default(0) @map("longest_streak")
+  goalId        String?    @map("goal_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  logs          HabitLog[]
+
+  @@map("habits")
+}
+
+// ─── Habit Logs ─────────────────────
+model HabitLog {
+  id        String   @id @default(uuid())
+  habitId   String   @map("habit_id")
+  dayPlanId String   @map("day_plan_id")
+  date      String
+  status    String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  habit     Habit    @relation(fields: [habitId], references: [id])
+  dayPlan   DayPlan  @relation(fields: [dayPlanId], references: [id])
+
+  @@unique([habitId, date])
+  @@map("habit_logs")
+}
+
+// ─── Urge Events ────────────────────
+model UrgeEvent {
+  id          String   @id @default(uuid())
+  habitId     String   @map("habit_id")
+  dayPlanId   String   @map("day_plan_id")
+  intensity   Int
+  trigger     String?
+  copingUsed  String?  @map("coping_used")
+  resisted    Boolean
+  createdAt   DateTime @default(now()) @map("created_at")
+  dayPlan     DayPlan  @relation(fields: [dayPlanId], references: [id])
+
+  @@map("urge_events")
+}
+
+// ─── Journal Entries ────────────────
+model JournalEntry {
+  id              String   @id @default(uuid())
+  dayPlanId       String   @unique @map("day_plan_id")
+  date            String   @unique
+  content         String
+  wentWell        String?  @map("went_well")
+  wentWrong       String?  @map("went_wrong")
+  improveTomorrow String?  @map("improve_tomorrow")
+  mood            Int?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  dayPlan         DayPlan  @relation(fields: [dayPlanId], references: [id])
+
+  @@map("journal_entries")
+}
+
+// ─── Notes ──────────────────────────
+model Note {
+  id             String   @id @default(uuid())
+  title          String
+  content        String
+  category       String?
+  tags           Json?    @default("[]")
+  nextReviewDate String?  @map("next_review_date")
+  easeFactor     Float?   @default(2.5) @map("ease_factor")
+  interval       Int?     @default(0)
+  repetitions    Int?     @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("notes")
+}
+
+// ─── Daily Scores ───────────────────
+model DailyScore {
+  id                String   @id @default(uuid())
+  date              String   @unique
+  dayPlanId         String   @unique @map("day_plan_id")
+  efficiencyScore   Int      @default(0) @map("efficiency_score")
+  consistencyScore  Int      @default(0) @map("consistency_score")
+  deepWorkMinutes   Int      @default(0) @map("deep_work_minutes")
+  habitScore        Int      @default(0) @map("habit_score")
+  overallScore      Int      @default(0) @map("overall_score")
+  createdAt         DateTime @default(now()) @map("created_at")
+  dayPlan           DayPlan  @relation(fields: [dayPlanId], references: [id])
+
+  @@map("daily_scores")
+}
+
+// ─── AI Chat Messages ───────────────
+model AIChatMessage {
+  id        String   @id @default(uuid())
+  role      String
+  content   String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ai_chat_messages")
+}

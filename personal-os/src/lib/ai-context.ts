@@ -1,6 +1,5 @@
-import { db } from "./db";
 import { getTodayDateString } from "./utils";
-import { computeScore, type ScoreBreakdown } from "./scoring";
+import type { ScoreBreakdown } from "./scoring";
 import type {
   DayPlan,
   TimeBlock,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { DailyScore, ScoreBand } from "@/types";
@@ -23,6 +23,20 @@ export function ScoreRevealModal({ score, onClose }: ScoreRevealModalProps) {
   const [revealed, setRevealed] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const band = BAND_CONFIG[score.scoreBand];
+
+  // Pre-compute confetti particle positions to avoid impure calls during render
+  const confettiParticles = useMemo(
+    () =>
+      Array.from({ length: 20 }).map((_, i) => ({
+        left: `${(((i * 37 + 13) % 100))}%`,
+        top: `${(((i * 23 + 7) % 40))}%`,
+        backgroundColor: ["#ec5b13", "#10b981", "#f59e0b", "#3b82f6", "#8b5cf6"][i % 5],
+        animationDelay: `${(i * 0.1) % 2}s`,
+        animationDuration: `${1 + (i * 0.13) % 2}s`,
+        opacity: 0.8,
+      })),
+    []
+  );
 
   // Animate score counting up
   useEffect(() => {
@@ -58,18 +72,11 @@ export function ScoreRevealModal({ score, onClose }: ScoreRevealModalProps) {
         {/* Confetti particles */}
         {showConfetti && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            {Array.from({ length: 20 }).map((_, i) => (
+            {confettiParticles.map((particle, i) => (
               <div
                 key={i}
                 className="absolute w-2 h-2 rounded-sm animate-bounce"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 40}%`,
-                  backgroundColor: ["#ec5b13", "#10b981", "#f59e0b", "#3b82f6", "#8b5cf6"][i % 5],
-                  animationDelay: `${Math.random() * 2}s`,
-                  animationDuration: `${1 + Math.random() * 2}s`,
-                  opacity: 0.8,
-                }}
+                style={particle}
               />
             ))}
           </div>

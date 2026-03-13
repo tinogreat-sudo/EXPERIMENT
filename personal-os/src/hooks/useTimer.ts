@@ -92,25 +92,25 @@ interface UseTimerReturn {
 }
 
 export function useTimer(): UseTimerReturn {
-  // Restore persisted state on mount
-  const persisted = useRef(loadPersisted());
+  // Restore persisted state on mount (read once via lazy initializers)
+  const [initialPersisted] = useState(loadPersisted);
   const didRestore = useRef(false);
 
   const [state, setState] = useState<TimerState>(() => {
-    const p = persisted.current;
+    const p = initialPersisted;
     if (p && (p.state === "running" || p.state === "paused")) return p.state;
     return "idle";
   });
   const [config, setConfig] = useState<TimerConfig>(() => {
-    const p = persisted.current;
+    const p = initialPersisted;
     if (p) return DEFAULT_CONFIGS[p.mode];
     return DEFAULT_CONFIGS.pomodoro;
   });
   const [intervalType, setIntervalType] = useState<"work" | "short-break" | "long-break">(() => {
-    return persisted.current?.intervalType ?? "work";
+    return initialPersisted?.intervalType ?? "work";
   });
   const [secondsRemaining, setSecondsRemaining] = useState(() => {
-    const p = persisted.current;
+    const p = initialPersisted;
     if (p && (p.state === "running" || p.state === "paused")) {
       // Account for elapsed time while navigated away
       if (p.state === "running") {
@@ -121,18 +121,18 @@ export function useTimer(): UseTimerReturn {
     }
     return DEFAULT_CONFIGS.pomodoro.workMinutes * 60;
   });
-  const [completedIntervals, setCompletedIntervals] = useState(() => persisted.current?.completedIntervals ?? 0);
-  const [sessionTitle, setSessionTitle] = useState(() => persisted.current?.sessionTitle ?? "");
-  const [categoryId, setCategoryId] = useState(() => persisted.current?.categoryId ?? "");
-  const [skillId, setSkillId] = useState<string | null>(persisted.current?.skillId ?? null);
-  const [goalId, setGoalId] = useState<string | null>(persisted.current?.goalId ?? null);
+  const [completedIntervals, setCompletedIntervals] = useState(() => initialPersisted?.completedIntervals ?? 0);
+  const [sessionTitle, setSessionTitle] = useState(() => initialPersisted?.sessionTitle ?? "");
+  const [categoryId, setCategoryId] = useState(() => initialPersisted?.categoryId ?? "");
+  const [skillId, setSkillId] = useState<string | null>(() => initialPersisted?.skillId ?? null);
+  const [goalId, setGoalId] = useState<string | null>(() => initialPersisted?.goalId ?? null);
   const [pendingRating, setPendingRating] = useState(false);
   const [sessionNotes, setSessionNotes] = useState("");
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const sessionStartRef = useRef<string | null>(persisted.current?.sessionStartedAt ?? null);
-  const timeSessionIdRef = useRef<string | null>(persisted.current?.timeSessionId ?? null);
-  const intervalStartRef = useRef<string | null>(persisted.current?.intervalStartedAt ?? null);
+  const sessionStartRef = useRef<string | null>(initialPersisted?.sessionStartedAt ?? null);
+  const timeSessionIdRef = useRef<string | null>(initialPersisted?.timeSessionId ?? null);
+  const intervalStartRef = useRef<string | null>(initialPersisted?.intervalStartedAt ?? null);
 
   const totalSeconds =
     intervalType === "work"
@@ -141,8 +141,8 @@ export function useTimer(): UseTimerReturn {
         ? config.longBreakMinutes * 60
         : config.breakMinutes * 60;
 
-  // Persist state changes
-  const persist = useCallback(() => {
+  // Persist state changes (ref reads happen inside the effect, not during render)
+  useEffect(() => {
     if (state === "idle") {
       savePersisted(null);
     } else {
@@ -163,10 +163,6 @@ export function useTimer(): UseTimerReturn {
       });
     }
   }, [state, config.mode, intervalType, secondsRemaining, completedIntervals, sessionTitle, categoryId, skillId, goalId]);
-
-  useEffect(() => {
-    persist();
-  }, [persist]);
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -191,13 +187,13 @@ export function useTimer(): UseTimerReturn {
 
   // Auto-resume running timer on mount
   useEffect(() => {
-    if (!didRestore.current && persisted.current?.state === "running" && secondsRemaining > 0) {
+    if (!didRestore.current && initialPersisted?.state === "running" && secondsRemaining > 0) {
       didRestore.current = true;
       startCountdown();
     } else {
       didRestore.current = true;
     }
-  }, [startCountdown, secondsRemaining]);
+  }, [startCountdown, secondsRemaining, initialPersisted]);
 
   // Record a FocusSession for the completed interval
   const recordFocusInterval = useCallback(async (type: "work" | "short-break" | "long-break", wasCompleted: boolean) => {
@@ -372,10 +368,11 @@ export function useTimer(): UseTimerReturn {
     savePersisted(null);
   }, [clearTimer, config.workMinutes]);
 
-  // Handle interval completion — auto skip
+  // Handle interval completion — auto skip via setTimeout to avoid setState-in-effect
   useEffect(() => {
     if (state === "completed") {
-      skip();
+      const timeoutId = setTimeout(() => skip(), 0);
+      return () => clearTimeout(timeoutId);
     }
   }, [state, skip]);
 

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Available models — rotated per call to spread load
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const MODELS = [
   "gemini-2.5-flash",
   "gemini-3-flash-preview",

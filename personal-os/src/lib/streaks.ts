@@ -26,8 +26,6 @@ export async function computeStreak(
     }
   }
 
-  const sortedDates = Array.from(dateMap.keys()).sort().reverse();
-
   function isSuccess(log: HabitLog): boolean {
     if (habitType === "positive") return log.status === "done";
     return log.status === "resisted" || log.status === "no-urge";

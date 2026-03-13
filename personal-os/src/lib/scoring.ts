@@ -18,7 +18,7 @@ const MAX_FOCUS = 20;
 const MAX_GOALS = 20;
 const MAX_HABITS = 15;
 const MAX_SKILLS = 10;
-const MAX_REFLECTION = 10;
+// Note: Reflection max is 10 (4 + 3 + 3) — built into the point values below
 const MAX_DISTRACTION_PENALTY = 20;
 
 // ===== Helpers =====

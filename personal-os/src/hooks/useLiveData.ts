@@ -3,7 +3,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import { getTodayDateString } from "@/lib/utils";
-import type { DayPlan, DayTemplate, TimeBlock, TimeSession, HabitLog, Goal, Habit, Category, Skill, UrgeEvent, JournalEntry, UserSettings, DailyScore } from "@/types";
+import type { DayPlan, DayTemplate, TimeBlock, TimeSession, HabitLog, Goal, Habit, Category, Skill, UrgeEvent, JournalEntry, UserSettings, DailyScore, Note } from "@/types";
 
 export function useTodayPlan(): DayPlan | undefined {
   const today = getTodayDateString();
@@ -42,7 +42,7 @@ export function useHabits(activeOnly = true): Habit[] {
   ) ?? [];
 }
 
-export function useDayTemplates() {
+export function useDayTemplates(): DayTemplate[] {
   return useLiveQuery(() => db.dayTemplates.toArray()) ?? [];
 }
 
@@ -187,4 +187,15 @@ export function useUrgeFrequency(habitId?: string): { day: string; count: number
 
     return dayNames.map((day, i) => ({ day, count: counts[i] }));
   }, [habitId]) ?? [];
+}
+
+/** Notes due for spaced repetition review today */
+export function useNotesDueForReview(): Note[] {
+  const today = getTodayDateString();
+  return useLiveQuery(async () => {
+    const notes = await db.notes.toArray();
+    return notes.filter(
+      (n) => n.reviewStatus !== "known" && n.nextReviewDate !== null && n.nextReviewDate <= today
+    );
+  }, [today]) ?? [];
 }

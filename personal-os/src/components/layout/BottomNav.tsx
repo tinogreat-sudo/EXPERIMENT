@@ -8,8 +8,8 @@ const TABS = [
   { href: "/", label: "Home", icon: "dashboard" },
   { href: "/schedule", label: "Schedule", icon: "calendar_today" },
   { href: "/timer", label: "Timer", icon: "timer" },
-  { href: "/habits", label: "Habits", icon: "checklist" },
-  { href: "/ai-coach", label: "Coach", icon: "psychology" },
+  { href: "/second-brain", label: "Notes", icon: "psychology_alt" },
+  { href: "/settings", label: "Settings", icon: "settings" },
 ];
 
 export function BottomNav() {

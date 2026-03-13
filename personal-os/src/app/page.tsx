@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { MetricCard } from "@/components/score/MetricCard";
 import { ScoreRevealModal } from "@/components/score/ScoreRevealModal";
 import { TimelineBar } from "@/components/schedule/TimelineBar";
 import { TimerWidget } from "@/components/timer/TimerWidget";
 import { HabitChecklist } from "@/components/habits/HabitChecklist";
-import { useHabits, useTodayHabitLogs, useTodaySessions, useTodayPlan } from "@/hooks/useLiveData";
+import { useHabits, useTodayHabitLogs, useTodaySessions, useTodayPlan, useDayTemplates, useNotesDueForReview } from "@/hooks/useLiveData";
 import { useTodayScore, useTodayDailyScore } from "@/hooks/useScore";
 import { useTimer } from "@/hooks/useTimer";
 import { Button } from "@/components/ui";
@@ -15,7 +16,7 @@ import { db } from "@/lib/db";
 import { getTodayDateString } from "@/lib/utils";
 import { computeAndSaveDailyScore } from "@/lib/scoring";
 import { useCallback, useMemo } from "react";
-import type { DailyScore } from "@/types";
+import type { DailyScore, DayTemplate, DayPlan } from "@/types";
 
 export default function Dashboard() {
   const timer = useTimer();
@@ -25,6 +26,8 @@ export default function Dashboard() {
   const todayPlan = useTodayPlan();
   const todayScore = useTodayScore();
   const dailyScore = useTodayDailyScore();
+  const templates = useDayTemplates();
+  const notesDue = useNotesDueForReview();
   const [showStartDay, setShowStartDay] = useState(false);
   const [showScoreReveal, setShowScoreReveal] = useState(false);
   const [revealScore, setRevealScore] = useState<DailyScore | null>(null);
@@ -80,24 +83,50 @@ export default function Dashboard() {
     }
   }, [habitLogs]);
 
-  async function startMyDay(intention: string, energy: number) {
+  async function startMyDay(data: {
+    intention: string;
+    energy: number;
+    sleepHours: number | null;
+    sleepQuality: number | null;
+    bedtime: string | null;
+    wakeTime: string | null;
+    templateId: string | null;
+  }) {
     const today = getTodayDateString();
     const now = new Date().toISOString();
     let plan = await db.dayPlans.where("date").equals(today).first();
     if (!plan) {
       plan = {
-        id: uuid(), date: today, dayType: "work", templateId: null, intention,
-        sleepHours: null, sleepQuality: null, bedtime: null, wakeTime: null,
-        morningEnergy: energy, overallEnergy: null, overallFocus: null,
+        id: uuid(), date: today, dayType: "work", templateId: data.templateId,
+        intention: data.intention,
+        sleepHours: data.sleepHours, sleepQuality: data.sleepQuality,
+        bedtime: data.bedtime, wakeTime: data.wakeTime,
+        morningEnergy: data.energy, overallEnergy: null, overallFocus: null,
         startedAt: now, endedAt: null, status: "active",
         createdAt: now, updatedAt: now, syncedAt: null,
       };
       await db.dayPlans.add(plan);
     } else {
       await db.dayPlans.update(plan.id, {
-        intention, morningEnergy: energy, startedAt: now, status: "active", updatedAt: now,
+        intention: data.intention,
+        morningEnergy: data.energy,
+        sleepHours: data.sleepHours,
+        sleepQuality: data.sleepQuality,
+        bedtime: data.bedtime,
+        wakeTime: data.wakeTime,
+        startedAt: now,
+        status: "active",
+        updatedAt: now,
+        ...(data.templateId ? { templateId: data.templateId } : {}),
       });
     }
+
+    // Load template blocks if selected
+    if (data.templateId) {
+      const { loadTemplateIntoPlan } = await import("@/lib/dayplan");
+      await loadTemplateIntoPlan(data.templateId, today);
+    }
+
     setShowStartDay(false);
   }
 
@@ -339,18 +368,48 @@ export default function Dashboard() {
               <span className="material-symbols-outlined text-5xl text-slate-600 mb-4">timer</span>
               <h3 className="text-xl font-bold mb-2">Ready to Focus?</h3>
               <p className="text-slate-400 text-sm mb-6">Start your first session</p>
-              <a
+              <Link
                 href="/timer"
                 className="w-full bg-primary text-white py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
               >
                 <span className="material-symbols-outlined filled">play_arrow</span>
                 Start Timer
-              </a>
+              </Link>
             </div>
           )}
 
           {/* Habits */}
           <HabitChecklist habits={habits} logs={habitLogs} onToggle={handleHabitToggle} />
+
+          {/* Second Brain — Notes due for review */}
+          {notesDue.length > 0 && (
+            <div className="bg-surface-light dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-warning text-lg">pending_actions</span>
+                  Notes to Review
+                </h3>
+                <Link href="/second-brain" className="text-xs text-primary font-bold hover:underline">
+                  Review All
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {notesDue.slice(0, 3).map((note) => (
+                  <Link
+                    key={note.id}
+                    href="/second-brain"
+                    className="flex items-start gap-2 p-2 rounded-lg hover:bg-surface-light-hover dark:hover:bg-surface-dark-hover transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm text-warning mt-0.5 shrink-0">note</span>
+                    <span className="text-xs font-medium line-clamp-2 text-text-secondary-light dark:text-text-secondary-dark">{note.title}</span>
+                  </Link>
+                ))}
+                {notesDue.length > 3 && (
+                  <p className="text-xs text-text-muted-light dark:text-text-muted-dark pl-2">+{notesDue.length - 3} more due</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -359,6 +418,8 @@ export default function Dashboard() {
         <StartDayModal
           onStart={startMyDay}
           onClose={() => setShowStartDay(false)}
+          templates={templates}
+          todayPlan={todayPlan ?? null}
         />
       )}
 
@@ -373,9 +434,57 @@ export default function Dashboard() {
   );
 }
 
-function StartDayModal({ onStart, onClose }: { onStart: (intention: string, energy: number) => void; onClose: () => void }) {
-  const [intention, setIntention] = useState("");
-  const [energy, setEnergy] = useState(3);
+type StartData = {
+  intention: string;
+  energy: number;
+  sleepHours: number | null;
+  sleepQuality: number | null;
+  bedtime: string | null;
+  wakeTime: string | null;
+  templateId: string | null;
+};
+
+function StartDayModal({
+  onStart,
+  onClose,
+  templates,
+  todayPlan,
+}: {
+  onStart: (data: StartData) => void;
+  onClose: () => void;
+  templates: DayTemplate[];
+  todayPlan: DayPlan | null;
+}) {
+  const [step, setStep] = useState(1);
+  const TOTAL_STEPS = 3;
+
+  // Step 1 — Sleep
+  const [sleepHours, setSleepHours] = useState<string>(todayPlan?.sleepHours ? String(todayPlan.sleepHours) : "");
+  const [sleepQuality, setSleepQuality] = useState(todayPlan?.sleepQuality ?? 3);
+  const [bedtime, setBedtime] = useState(todayPlan?.bedtime ?? "");
+  const [wakeTime, setWakeTime] = useState(todayPlan?.wakeTime ?? "");
+
+  // Step 2 — Template + Energy
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(todayPlan?.templateId ?? "");
+  const [energy, setEnergy] = useState(todayPlan?.morningEnergy ?? 3);
+
+  // Step 3 — Intention
+  const [intention, setIntention] = useState(todayPlan?.intention ?? "");
+
+  function handleFinish() {
+    onStart({
+      intention,
+      energy,
+      sleepHours: sleepHours ? parseFloat(sleepHours) : null,
+      sleepQuality,
+      bedtime: bedtime || null,
+      wakeTime: wakeTime || null,
+      templateId: selectedTemplate || null,
+    });
+  }
+
+  const STEP_TITLES = ["Last Night's Sleep", "Energy & Schedule", "Today's Intention"];
+  const STEP_ICONS = ["bedtime", "bolt", "wb_sunny"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -383,46 +492,187 @@ function StartDayModal({ onStart, onClose }: { onStart: (intention: string, ener
         onClick={(e) => e.stopPropagation()}
         className="bg-surface-light dark:bg-surface-dark rounded-2xl p-6 w-full max-w-md shadow-xl border border-border-light dark:border-border-dark"
       >
-        <div className="text-center mb-6">
-          <span className="material-symbols-outlined text-4xl text-warning filled mb-2">wb_sunny</span>
-          <h2 className="text-xl font-bold">Start Your Day</h2>
-          <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">Set your intention and check in.</p>
-        </div>
-
-        <label className="block mb-4">
-          <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-1 block">Today&apos;s Intention</span>
-          <input
-            className="w-full bg-bg-light dark:bg-bg-dark border border-border-light dark:border-border-dark rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            value={intention}
-            onChange={(e) => setIntention(e.target.value)}
-            placeholder="What's your main focus today?"
-          />
-        </label>
-
-        <div className="mb-6">
-          <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-2 block">Morning Energy</span>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((level) => (
-              <button
-                key={level}
-                onClick={() => setEnergy(level)}
-                className={`flex-1 py-3 rounded-lg text-center transition-all cursor-pointer ${
-                  energy === level
-                    ? "bg-warning/20 text-warning ring-2 ring-warning/40 font-bold"
-                    : "bg-surface-light-hover dark:bg-surface-dark-hover text-text-muted-light dark:text-text-muted-dark"
+        {/* Step indicator */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex gap-1.5">
+            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+              <div
+                key={i}
+                className={`h-1.5 rounded-full transition-all ${
+                  i + 1 <= step ? "bg-primary w-6" : "bg-border-light dark:bg-border-dark w-3"
                 }`}
-              >
-                <span className="text-lg">{level <= 2 ? "😴" : level <= 4 ? "⚡" : "🔥"}</span>
-                <p className="text-[10px] mt-0.5">{level}</p>
-              </button>
+              />
             ))}
           </div>
+          <span className="text-xs text-text-muted-light dark:text-text-muted-dark font-bold">
+            Step {step} of {TOTAL_STEPS}
+          </span>
         </div>
 
-        <Button variant="primary" className="w-full py-3" onClick={() => onStart(intention, energy)}>
-          <span className="material-symbols-outlined filled">wb_sunny</span>
-          Let&apos;s Go!
-        </Button>
+        <div className="text-center mb-6">
+          <span className="material-symbols-outlined text-4xl text-primary filled mb-2">{STEP_ICONS[step - 1]}</span>
+          <h2 className="text-xl font-bold">Start Your Day</h2>
+          <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">{STEP_TITLES[step - 1]}</p>
+        </div>
+
+        {/* Step 1: Sleep */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <label>
+                <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-1 block">Hours Slept</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={24}
+                  step={0.5}
+                  className="w-full bg-bg-light dark:bg-bg-dark border border-border-light dark:border-border-dark rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  value={sleepHours}
+                  onChange={(e) => setSleepHours(e.target.value)}
+                  placeholder="e.g. 7.5"
+                />
+              </label>
+              <label>
+                <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-1 block">Sleep Quality</span>
+                <div className="flex gap-1 mt-1.5">
+                  {[1, 2, 3, 4, 5].map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => setSleepQuality(q)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        sleepQuality === q
+                          ? "bg-primary/20 text-primary ring-1 ring-primary/40"
+                          : "bg-surface-light-hover dark:bg-surface-dark-hover text-text-muted-light dark:text-text-muted-dark"
+                      }`}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label>
+                <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-1 block">Bedtime</span>
+                <input
+                  type="time"
+                  className="w-full bg-bg-light dark:bg-bg-dark border border-border-light dark:border-border-dark rounded-lg px-3 py-2 text-sm"
+                  value={bedtime}
+                  onChange={(e) => setBedtime(e.target.value)}
+                />
+              </label>
+              <label>
+                <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-1 block">Wake Time</span>
+                <input
+                  type="time"
+                  className="w-full bg-bg-light dark:bg-bg-dark border border-border-light dark:border-border-dark rounded-lg px-3 py-2 text-sm"
+                  value={wakeTime}
+                  onChange={(e) => setWakeTime(e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Template + Energy */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <div>
+              <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-2 block">Load Day Template</span>
+              <div className="space-y-2 max-h-44 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplate("")}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-all cursor-pointer ${
+                    !selectedTemplate
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border-light dark:border-border-dark hover:border-primary/30"
+                  }`}
+                >
+                  <span className="font-medium">No template</span>
+                  <span className="text-xs text-text-muted-light dark:text-text-muted-dark ml-2">Start with a blank schedule</span>
+                </button>
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSelectedTemplate(t.id)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-all cursor-pointer ${
+                      selectedTemplate === t.id
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "border-border-light dark:border-border-dark hover:border-primary/30"
+                    }`}
+                  >
+                    <span className="font-medium">{t.name}</span>
+                    <span className="text-xs text-text-muted-light dark:text-text-muted-dark ml-2">
+                      {t.blocks.length} blocks · {t.dayType}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-2 block">Morning Energy</span>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => setEnergy(level)}
+                    className={`flex-1 py-3 rounded-lg text-center transition-all cursor-pointer ${
+                      energy === level
+                        ? "bg-warning/20 text-warning ring-2 ring-warning/40 font-bold"
+                        : "bg-surface-light-hover dark:bg-surface-dark-hover text-text-muted-light dark:text-text-muted-dark"
+                    }`}
+                  >
+                    <span className="text-lg">{level <= 2 ? "😴" : level <= 4 ? "⚡" : "🔥"}</span>
+                    <p className="text-[10px] mt-0.5">{level}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Intention */}
+        {step === 3 && (
+          <div>
+            <label className="block mb-4">
+              <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-1 block">Today&apos;s Intention</span>
+              <input
+                className="w-full bg-bg-light dark:bg-bg-dark border border-border-light dark:border-border-dark rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                value={intention}
+                onChange={(e) => setIntention(e.target.value)}
+                placeholder="What's your main focus today?"
+                autoFocus
+              />
+            </label>
+            <p className="text-xs text-text-muted-light dark:text-text-muted-dark">
+              This will be shown on your dashboard and included in your daily review.
+            </p>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <div className="flex gap-3 mt-6">
+          {step > 1 && (
+            <Button variant="ghost" className="flex-1" onClick={() => setStep(step - 1)}>
+              Back
+            </Button>
+          )}
+          {step < TOTAL_STEPS ? (
+            <Button variant="primary" className="flex-1" onClick={() => setStep(step + 1)}>
+              Next
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </Button>
+          ) : (
+            <Button variant="primary" className="flex-1 py-3" onClick={handleFinish}>
+              <span className="material-symbols-outlined filled">wb_sunny</span>
+              Let&apos;s Go!
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

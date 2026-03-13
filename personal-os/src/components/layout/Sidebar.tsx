@@ -21,8 +21,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/goals", label: "Goals", icon: "ads_click" },
   { href: "/skills", label: "Skills", icon: "military_tech" },
   { href: "/journal", label: "Journal", icon: "edit_note" },
+  { href: "/second-brain", label: "Second Brain", icon: "psychology_alt" },
   { href: "/analytics", label: "Analytics", icon: "monitoring" },
   { href: "/ai-coach", label: "AI Coach", icon: "psychology" },
+  { href: "/templates", label: "Templates", icon: "view_timeline" },
 ];
 
 export function Sidebar() {
@@ -31,6 +33,10 @@ export function Sidebar() {
     const habits = await db.habits.filter((h) => h.isActive).toArray();
     return habits.reduce((max, h) => Math.max(max, h.currentStreak), 0);
   }) ?? 0;
+  const displayName = useLiveQuery(async () => {
+    const arr = await db.userSettings.toArray();
+    return arr[0]?.displayName ?? "User";
+  }) ?? "User";
 
   return (
     <aside className="hidden md:flex w-20 lg:w-64 flex-col border-r border-border-dark bg-bg-light dark:bg-bg-dark h-screen sticky top-0 shrink-0">
@@ -79,10 +85,15 @@ export function Sidebar() {
         )}
         {/* Settings link */}
         <Link
-          href="#"
-          className="flex items-center gap-4 px-3 py-2 rounded-xl text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary/5 transition-colors"
+          href="/settings"
+          className={cn(
+            "flex items-center gap-4 px-3 py-2 rounded-xl transition-colors",
+            pathname === "/settings"
+              ? "bg-primary-light text-primary font-semibold"
+              : "text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary/5"
+          )}
         >
-          <span className="material-symbols-outlined">settings</span>
+          <span className={cn("material-symbols-outlined", pathname === "/settings" && "filled")}>settings</span>
           <span className="hidden lg:block text-sm">Settings</span>
         </Link>
         <div className="flex items-center gap-3 px-2">
@@ -91,7 +102,7 @@ export function Sidebar() {
           </div>
           <div className="hidden lg:block overflow-hidden">
             <p className="text-sm font-bold truncate text-text-primary-light dark:text-text-primary-dark">
-              User
+              {displayName}
             </p>
             <p className="text-xs text-text-muted-light dark:text-text-muted-dark">
               Personal OS

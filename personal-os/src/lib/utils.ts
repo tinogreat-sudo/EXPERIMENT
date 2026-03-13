@@ -46,3 +46,20 @@ export function getCurrentTimeString(): string {
     hour12: true,
   });
 }
+
+/** Apply a theme value to the document root */
+export function applyTheme(theme: "dark" | "light" | "system"): void {
+  if (theme === "dark") {
+    document.documentElement.classList.add("dark");
+  } else if (theme === "light") {
+    document.documentElement.classList.remove("dark");
+  } else {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.classList.toggle("dark", prefersDark);
+  }
+}
+
+/** Format minutes into a decimal hours string, e.g. 90 → "1.5h" */
+export function minutesToHours(minutes: number): string {
+  return `${Math.round((minutes / 60) * 10) / 10}h`;
+}

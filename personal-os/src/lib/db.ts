@@ -82,6 +82,11 @@ export class PersonalOSDB extends Dexie {
         }
       }
     });
+
+    this.version(4).stores({
+      dayTemplates: "id, name, dayType, syncedAt",
+      notes: "id, createdAt, nextReviewDate, syncedAt",
+    });
   }
 }
 

@@ -56,10 +56,10 @@ export function useSkills(): Skill[] {
   return useLiveQuery(() => db.skills.toArray()) ?? [];
 }
 
-export function useUserSettings(): UserSettings | undefined {
+export function useUserSettings(): UserSettings | null | undefined {
   return useLiveQuery(async () => {
     const arr = await db.userSettings.toArray();
-    return arr[0];
+    return arr[0] ?? null;
   });
 }
 

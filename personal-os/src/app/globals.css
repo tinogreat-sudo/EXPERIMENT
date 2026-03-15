@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Use class-driven dark mode so theme toggles work independently of OS preference */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ===== DESIGN TOKENS (UI-DESIGN.md) ===== */
 @theme inline {
   /* Brand */

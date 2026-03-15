@@ -73,7 +73,10 @@ export function useTodayUrgeEvents(): UrgeEvent[] {
 
 export function useTodayJournal(): JournalEntry | undefined {
   const today = getTodayDateString();
-  return useLiveQuery(() => db.journalEntries.where("date").equals(today).first());
+  return useLiveQuery(async () => {
+    const entries = await db.journalEntries.where("date").equals(today).sortBy("updatedAt");
+    return entries[entries.length - 1];
+  });
 }
 
 export function useRecentScores(days: number = 7): DailyScore[] {

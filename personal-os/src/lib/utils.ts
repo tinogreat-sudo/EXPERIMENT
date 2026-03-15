@@ -49,6 +49,8 @@ export function getCurrentTimeString(): string {
 
 /** Apply a theme value to the document root */
 export function applyTheme(theme: "dark" | "light" | "system"): void {
+  localStorage.setItem("pos-theme", theme);
+
   if (theme === "dark") {
     document.documentElement.classList.add("dark");
   } else if (theme === "light") {

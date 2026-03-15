@@ -157,7 +157,8 @@ export default function Dashboard() {
         const recentScores = await db.dailyScores.orderBy("date").reverse().limit(7).toArray();
         const recentJournals = await db.journalEntries.orderBy("date").reverse().limit(3).toArray();
         const settingsArr = await db.userSettings.toArray();
-        const journalEntry = await db.journalEntries.where("date").equals(today).first() ?? null;
+        const journalEntries = await db.journalEntries.where("date").equals(today).sortBy("updatedAt");
+        const journalEntry = journalEntries[journalEntries.length - 1] ?? null;
 
         const res = await fetch("/api/ai/score", {
           method: "POST",

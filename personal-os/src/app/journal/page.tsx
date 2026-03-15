@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
@@ -14,8 +14,24 @@ const MOOD_ICONS = ["", "sentiment_very_dissatisfied", "sentiment_dissatisfied",
 export default function JournalPage() {
   const today = getTodayDateString();
   const entries = useLiveQuery(() => db.journalEntries.orderBy("date").reverse().toArray()) ?? [];
-  const todayEntry = useMemo(() => entries.find((e) => e.date === today), [entries, today]);
-  const [mode, setMode] = useState<"write" | "history">(todayEntry ? "write" : "write");
+  const todayEntries = useMemo(
+    () => entries
+      .filter((e) => e.date === today)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [entries, today]
+  );
+  const [mode, setMode] = useState<"write" | "history">("write");
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedEntryId && todayEntries.some((e) => e.id === selectedEntryId)) return;
+    setSelectedEntryId(todayEntries[0]?.id ?? null);
+  }, [todayEntries, selectedEntryId]);
+
+  const selectedEntry = useMemo(
+    () => todayEntries.find((e) => e.id === selectedEntryId) ?? null,
+    [todayEntries, selectedEntryId]
+  );
 
   return (
     <div className="p-4 lg:p-8 max-w-4xl mx-auto">
@@ -44,7 +60,52 @@ export default function JournalPage() {
       </div>
 
       {mode === "write" ? (
-        <JournalEditor entry={todayEntry ?? null} date={today} />
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
+              {todayEntries.length} entr{todayEntries.length === 1 ? "y" : "ies"} today
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => setSelectedEntryId(null)}
+            >
+              New Entry
+            </Button>
+          </div>
+
+          {todayEntries.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {todayEntries.map((entry) => {
+                const isActive = entry.id === selectedEntryId;
+                const entryTime = new Date(entry.createdAt).toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
+                return (
+                  <button
+                    key={entry.id}
+                    onClick={() => setSelectedEntryId(entry.id)}
+                    className={cn(
+                      "px-3 py-2 rounded-lg text-xs font-bold cursor-pointer whitespace-nowrap border transition-all",
+                      isActive
+                        ? "bg-primary text-white border-primary"
+                        : "bg-surface-light dark:bg-surface-dark border-border-light dark:border-border-dark"
+                    )}
+                  >
+                    {entryTime}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <JournalEditor
+            key={selectedEntry?.id ?? "new-entry"}
+            entry={selectedEntry}
+            date={today}
+            onSaved={(id) => setSelectedEntryId(id)}
+          />
+        </div>
       ) : (
         <JournalHistory entries={entries} />
       )}
@@ -52,13 +113,29 @@ export default function JournalPage() {
   );
 }
 
-function JournalEditor({ entry, date }: { entry: JournalEntry | null; date: string }) {
+function JournalEditor({
+  entry,
+  date,
+  onSaved,
+}: {
+  entry: JournalEntry | null;
+  date: string;
+  onSaved: (id: string) => void;
+}) {
   const [content, setContent] = useState(entry?.content ?? "");
   const [wentWell, setWentWell] = useState(entry?.wentWell ?? "");
   const [wentWrong, setWentWrong] = useState(entry?.wentWrong ?? "");
   const [improve, setImprove] = useState(entry?.improveTomorrow ?? "");
   const [mood, setMood] = useState(entry?.mood ?? 0);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setContent(entry?.content ?? "");
+    setWentWell(entry?.wentWell ?? "");
+    setWentWrong(entry?.wentWrong ?? "");
+    setImprove(entry?.improveTomorrow ?? "");
+    setMood(entry?.mood ?? 0);
+  }, [entry]);
 
   async function handleSave() {
     setSaving(true);
@@ -77,20 +154,23 @@ function JournalEditor({ entry, date }: { entry: JournalEntry | null; date: stri
       await db.dayPlans.add(dayPlan);
     }
 
+    let savedId = entry?.id;
     if (entry) {
       await db.journalEntries.update(entry.id, {
         content, wentWell: wentWell || null, wentWrong: wentWrong || null,
         improveTomorrow: improve || null, mood: mood || null, updatedAt: now,
       });
     } else {
+      savedId = uuid();
       await db.journalEntries.add({
-        id: uuid(), dayPlanId: dayPlan.id, date, content,
+        id: savedId, dayPlanId: dayPlan.id, date, content,
         wentWell: wentWell || null, wentWrong: wentWrong || null,
         improveTomorrow: improve || null, mood: mood || null,
         createdAt: now, updatedAt: now, syncedAt: null,
       });
     }
     setSaving(false);
+    if (savedId) onSaved(savedId);
   }
 
   return (
@@ -167,7 +247,7 @@ function JournalEditor({ entry, date }: { entry: JournalEntry | null; date: stri
       </div>
 
       <Button variant="primary" size="lg" className="w-full" onClick={handleSave} disabled={saving}>
-        {saving ? "Saving..." : entry ? "Update Entry" : "Save Entry"}
+        {saving ? "Saving..." : entry ? "Update Entry" : "Save New Entry"}
       </Button>
     </div>
   );
@@ -190,7 +270,11 @@ function JournalHistory({ entries }: { entries: JournalEntry[] }) {
           className="p-4 rounded-xl border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-bold">{new Date(entry.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
+            <span className="text-sm font-bold">
+              {new Date(entry.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+              {" at "}
+              {new Date(entry.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+            </span>
             {entry.mood && (
               <span className="material-symbols-outlined text-lg" style={{ color: "#ec5b13" }}>
                 {MOOD_ICONS[entry.mood]}

@@ -4,7 +4,8 @@ import { useState } from "react";
 import { v4 as uuid } from "uuid";
 import { db } from "@/lib/db";
 import { Button, Card } from "@/components/ui";
-import { applyTheme, minutesToHours } from "@/lib/utils";
+import { minutesToHours } from "@/lib/utils";
+import { useTheme } from "@/components/layout/ThemeProvider";
 import { useUserSettings } from "@/hooks/useLiveData";
 import type { UserSettings, DayType } from "@/types";
 
@@ -32,6 +33,7 @@ export default function SettingsPage() {
 }
 
 function SettingsForm({ settings }: { settings: UserSettings | null }) {
+  const { setTheme: setAppTheme } = useTheme();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -47,6 +49,8 @@ function SettingsForm({ settings }: { settings: UserSettings | null }) {
   const [pomodoroLongBreak, setPomodoroLongBreak] = useState(settings?.pomodoroLongBreak ?? 15);
   const [pomodoroSessionsBeforeLong, setPomodoroSessionsBeforeLong] = useState(settings?.pomodoroSessionsBeforeLong ?? 4);
   const [theme, setTheme] = useState<"dark" | "light" | "system">(settings?.theme ?? "dark");
+  const [calendarDensity, setCalendarDensity] = useState<"compact" | "comfortable" | "spacious">(settings?.calendarDensity ?? "comfortable");
+  const [calendarColorSet, setCalendarColorSet] = useState<"category" | "status" | "high-contrast">(settings?.calendarColorSet ?? "category");
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +70,8 @@ function SettingsForm({ settings }: { settings: UserSettings | null }) {
       pomodoroLongBreak,
       pomodoroSessionsBeforeLong,
       theme,
+      calendarDensity,
+      calendarColorSet,
       calibrationComplete: settings?.calibrationComplete ?? false,
       calibrationStartDate: settings?.calibrationStartDate ?? null,
       createdAt: settings?.createdAt ?? now,
@@ -75,8 +81,8 @@ function SettingsForm({ settings }: { settings: UserSettings | null }) {
 
     await db.userSettings.put(updated);
 
-    // Apply theme immediately
-    applyTheme(theme);
+    // Apply and persist theme via shared provider
+    setAppTheme(theme);
 
     setSaving(false);
     setSaved(true);
@@ -273,7 +279,7 @@ function SettingsForm({ settings }: { settings: UserSettings | null }) {
         {/* Theme */}
         <Card>
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-muted-light dark:text-text-muted-dark mb-4">Appearance</h2>
-          <div>
+          <div className="space-y-4">
             <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-2 block">Theme</span>
             <div className="flex gap-2">
               {(["dark", "light", "system"] as const).map((t) => (
@@ -293,6 +299,32 @@ function SettingsForm({ settings }: { settings: UserSettings | null }) {
                   {t}
                 </button>
               ))}
+            </div>
+
+            <div>
+              <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-1 block">Calendar Density</span>
+              <select
+                className="w-full bg-bg-light dark:bg-bg-dark border border-border-light dark:border-border-dark rounded-lg px-3 py-2 text-sm"
+                value={calendarDensity}
+                onChange={(e) => setCalendarDensity(e.target.value as "compact" | "comfortable" | "spacious")}
+              >
+                <option value="compact">Compact</option>
+                <option value="comfortable">Comfortable</option>
+                <option value="spacious">Spacious</option>
+              </select>
+            </div>
+
+            <div>
+              <span className="text-xs font-bold text-text-secondary-light dark:text-text-secondary-dark uppercase mb-1 block">Calendar Color Set</span>
+              <select
+                className="w-full bg-bg-light dark:bg-bg-dark border border-border-light dark:border-border-dark rounded-lg px-3 py-2 text-sm"
+                value={calendarColorSet}
+                onChange={(e) => setCalendarColorSet(e.target.value as "category" | "status" | "high-contrast")}
+              >
+                <option value="category">Category Colors</option>
+                <option value="status">Status Colors</option>
+                <option value="high-contrast">High Contrast</option>
+              </select>
             </div>
           </div>
         </Card>

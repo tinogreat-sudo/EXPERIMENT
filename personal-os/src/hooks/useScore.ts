@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   pomodoroLongBreak: 15,
   pomodoroSessionsBeforeLong: 4,
   theme: "dark",
+  calendarDensity: "comfortable",
+  calendarColorSet: "category",
   calibrationComplete: false,
   calibrationStartDate: null,
   createdAt: "",
@@ -38,7 +40,8 @@ export function useTodayScore(): ScoreBreakdown | null {
     const sessions = await db.timeSessions.where("dayPlanId").equals(dayPlan.id).toArray();
     const habits = await db.habits.filter((h) => h.isActive).toArray();
     const habitLogs = await db.habitLogs.where("date").equals(today).toArray();
-    const journalEntry = await db.journalEntries.where("date").equals(today).first() ?? null;
+    const journalEntries = await db.journalEntries.where("date").equals(today).sortBy("updatedAt");
+    const journalEntry = journalEntries[journalEntries.length - 1] ?? null;
     const settingsArr = await db.userSettings.toArray();
     const settings = settingsArr[0] ?? DEFAULT_SETTINGS;
 

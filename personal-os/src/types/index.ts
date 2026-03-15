@@ -14,6 +14,8 @@ export interface UserSettings {
   pomodoroLongBreak: number; // default 15
   pomodoroSessionsBeforeLong: number; // default 4
   theme: "dark" | "light" | "system";
+  calendarDensity?: "compact" | "comfortable" | "spacious";
+  calendarColorSet?: "category" | "status" | "high-contrast";
   calibrationComplete: boolean;
   calibrationStartDate: string | null;
   createdAt: string;
@@ -68,6 +70,7 @@ export interface TemplateBlock {
 }
 
 export type BlockStatus = "pending" | "in-progress" | "completed" | "skipped" | "moved";
+export type BlockRecurrence = "none" | "daily" | "weekdays" | "weekly";
 
 export interface TimeBlock {
   id: string;
@@ -77,6 +80,8 @@ export interface TimeBlock {
   startTime: string; // HH:MM
   endTime: string;
   isNonNegotiable: boolean;
+  recurrence?: BlockRecurrence;
+  recurrenceUntil?: string | null; // YYYY-MM-DD
   status: BlockStatus;
   goalId: string | null;
   skillId: string | null;

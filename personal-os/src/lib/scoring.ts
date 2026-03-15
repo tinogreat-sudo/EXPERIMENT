@@ -243,13 +243,15 @@ export async function computeAndSaveDailyScore(date?: string): Promise<DailyScor
   const sessions = await db.timeSessions.where("dayPlanId").equals(dayPlan.id).toArray();
   const habits = await db.habits.filter((h) => h.isActive).toArray();
   const habitLogs = await db.habitLogs.where("date").equals(targetDate).toArray();
-  const journalEntry = await db.journalEntries.where("date").equals(targetDate).first() ?? null;
+  const journalEntries = await db.journalEntries.where("date").equals(targetDate).sortBy("updatedAt");
+  const journalEntry = journalEntries[journalEntries.length - 1] ?? null;
   const settingsArr = await db.userSettings.toArray();
   const settings: UserSettings = settingsArr[0] ?? {
     id: "default", displayName: "User", deepWorkTarget: 180, skillBuildingTarget: 60,
     goalWorkTarget: 180, scoreThreshold: 70, defaultDayType: "work" as const, pomodoroWorkMinutes: 25,
     pomodoroBreakMinutes: 5, pomodoroLongBreak: 15, pomodoroSessionsBeforeLong: 4,
     theme: "dark" as const, calibrationComplete: false, calibrationStartDate: null,
+      calendarDensity: "comfortable" as const, calendarColorSet: "category" as const,
     createdAt: now, updatedAt: now, syncedAt: null,
   };
 

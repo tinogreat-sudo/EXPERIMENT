@@ -73,6 +73,8 @@ export async function loadTemplateIntoPlan(
     startTime: tb.startTime,
     endTime: tb.endTime,
     isNonNegotiable: tb.isNonNegotiable,
+    recurrence: "none",
+    recurrenceUntil: null,
     status: "pending",
     goalId: null,
     skillId: null,
